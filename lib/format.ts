@@ -24,8 +24,10 @@ export function num(v: unknown): number | null {
 }
 
 // Precio por metro cuadrado, automático: precio total / m². Asume MXN.
-// Devuelve null si falta precio o m², o si no son numéricos.
+// Devuelve null si falta precio o m², si no son numéricos, o si el precio
+// viene abreviado ("MX$2.41M" / "320K") — ahí no se puede dividir confiable.
 export function pricePerM2(precio: unknown, m2: unknown): string | null {
+  if (typeof precio === "string" && /\d[\d.,]*\s*[MmKk]/.test(precio)) return null;
   const p = num(precio);
   const m = num(m2);
   if (!p || !m) return null;
