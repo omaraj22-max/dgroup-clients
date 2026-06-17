@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, BedDouble, Maximize, Waves, Heart } from "lucide-react";
 import { T } from "@/lib/tokens";
 import { peso } from "@/lib/format";
+import { fetchFotos } from "@/lib/fotos";
 import type { Property } from "@/types";
 
 export default function PropertyCard({
@@ -14,7 +16,28 @@ export default function PropertyCard({
   onLike: () => void;
 }) {
   const router = useRouter();
-  const cover = p.fotos?.[0] || "https://picsum.photos/seed/" + p.id + "/800/600";
+  const manual = p.fotos?.[0];
+  const [cover, setCover] = useState<string>(manual || "");
+
+  // Si no hay foto manual pero sí URL de la página, jala la portada.
+  useEffect(() => {
+    if (manual) {
+      setCover(manual);
+      return;
+    }
+    if (p.website) {
+      let alive = true;
+      fetchFotos(p.website).then((imgs) => {
+        if (alive && imgs[0]) setCover(imgs[0]);
+      });
+      return () => {
+        alive = false;
+      };
+    }
+  }, [manual, p.website]);
+
+  const shown = cover || "https://picsum.photos/seed/" + p.id + "/800/600";
+  const waiting = !cover && !!p.website;
 
   return (
     <div
@@ -37,12 +60,25 @@ export default function PropertyCard({
         e.currentTarget.style.boxShadow = "0 1px 2px rgba(28,25,23,0.04)";
       }}
     >
-      <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden" }}>
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "4/3",
+          overflow: "hidden",
+          background: waiting ? T.line : "transparent",
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={cover}
+          src={shown}
           alt={p.nombre}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: waiting ? 0 : 1,
+            transition: "opacity .3s",
+          }}
         />
         <span
           style={{

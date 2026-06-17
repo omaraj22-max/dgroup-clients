@@ -2,14 +2,49 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, X, Loader2 } from "lucide-react";
 import { T, iconBtn } from "@/lib/tokens";
 
 // Galería de la página de detalle: flechas, dots y teclado (←/→/Esc).
-export default function Gallery({ fotos }: { fotos: string[] }) {
+export default function Gallery({
+  fotos,
+  loading = false,
+}: {
+  fotos: string[];
+  loading?: boolean;
+}) {
   const router = useRouter();
   const imgs = fotos.length ? fotos : ["https://picsum.photos/seed/detalle/1200/800"];
   const [idx, setIdx] = useState(0);
+
+  // Reinicia el índice si cambia el set de fotos (p.ej. al llegar del scraping).
+  useEffect(() => {
+    setIdx(0);
+  }, [fotos]);
+
+  // Mientras se traen las fotos de la página externa: skeleton + spinner.
+  if (loading && !fotos.length) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "16/10",
+          background: T.line,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <Loader2 size={28} className="spin" color={T.accent} />
+        <button
+          onClick={() => router.push("/propiedades")}
+          aria-label="Cerrar"
+          style={iconBtn("rgba(0,0,0,.5)", "#fff", { top: 14, right: 14 })}
+        >
+          <X size={20} />
+        </button>
+      </div>
+    );
+  }
 
   const next = () => setIdx((i) => (i + 1) % imgs.length);
   const prev = () => setIdx((i) => (i - 1 + imgs.length) % imgs.length);

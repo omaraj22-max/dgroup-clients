@@ -10,11 +10,13 @@ import {
   Heart,
   ExternalLink,
   ArrowLeft,
+  Ruler,
   type LucideIcon,
 } from "lucide-react";
 import { T } from "@/lib/tokens";
-import { peso } from "@/lib/format";
+import { peso, pricePerM2 } from "@/lib/format";
 import { apiGet, apiPost } from "@/lib/api";
+import { fetchFotos } from "@/lib/fotos";
 import { useSession } from "@/lib/session";
 import Gallery from "@/components/Gallery";
 import { FullLoader, Empty, ErrorState } from "@/components/states";
@@ -29,6 +31,10 @@ export default function PropiedadDetallePage() {
   const [prop, setProp] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Fotos resueltas: manuales del Sheet o, si no hay, las de la página externa.
+  const [fotos, setFotos] = useState<string[]>([]);
+  const [fotosLoading, setFotosLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!session) return;
@@ -55,6 +61,30 @@ export default function PropiedadDetallePage() {
   useEffect(() => {
     if (ready) load();
   }, [ready, load]);
+
+  // Resuelve las fotos cuando ya tenemos la propiedad.
+  useEffect(() => {
+    if (!prop) return;
+    if (prop.fotos && prop.fotos.length) {
+      setFotos(prop.fotos);
+      return;
+    }
+    if (prop.website) {
+      let alive = true;
+      setFotosLoading(true);
+      fetchFotos(prop.website)
+        .then((imgs) => {
+          if (alive) setFotos(imgs);
+        })
+        .finally(() => {
+          if (alive) setFotosLoading(false);
+        });
+      return () => {
+        alive = false;
+      };
+    }
+    setFotos([]);
+  }, [prop]);
 
   const toggleLike = async () => {
     if (!session || !prop) return;
@@ -106,6 +136,8 @@ export default function PropiedadDetallePage() {
       </div>
     );
 
+  const ppm2 = pricePerM2(prop.precio, prop.m2);
+
   const specs: { Icon: LucideIcon; label: string; val: string }[] = [
     prop.habitaciones && {
       Icon: BedDouble,
@@ -113,6 +145,7 @@ export default function PropiedadDetallePage() {
       val: String(prop.habitaciones),
     },
     prop.m2 && { Icon: Maximize, label: "Construcción", val: `${prop.m2} m²` },
+    ppm2 && { Icon: Ruler, label: "Precio / m²", val: ppm2 },
     prop.distancia_playa && {
       Icon: Waves,
       label: "A la playa",
@@ -171,7 +204,7 @@ export default function PropiedadDetallePage() {
             animation: "rise .35s cubic-bezier(.16,1,.3,1)",
           }}
         >
-          <Gallery fotos={prop.fotos || []} />
+          <Gallery fotos={fotos} loading={fotosLoading} />
 
           <div style={{ padding: "26px 24px 32px" }}>
             <div
