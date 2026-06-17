@@ -18,6 +18,7 @@ import { apiGet, apiPost } from "@/lib/api";
 import { fetchFotos } from "@/lib/fotos";
 import { useSession } from "@/lib/session";
 import Gallery from "@/components/Gallery";
+import PropertyMap from "@/components/PropertyMap";
 import { FullLoader, Empty, ErrorState } from "@/components/states";
 import type { PropertiesResponse, Property } from "@/types";
 
@@ -301,6 +302,8 @@ export default function PropiedadDetallePage() {
                 </p>
               </div>
             )}
+
+            {prop.mapa && <PropertyMap value={prop.mapa} />}
 
             {/* acciones */}
             <div style={{ display: "flex", gap: 12, marginTop: 30, flexWrap: "wrap" }}>

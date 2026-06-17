@@ -11,6 +11,7 @@ export type Property = {
   precio?: string | number;
   comentarios?: string;
   website?: string;
+  mapa?: string; // valor de la columna "Google maps" (link, coords o dirección)
   fotos: string[];
   liked?: boolean;
 };
