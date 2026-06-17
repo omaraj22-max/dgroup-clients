@@ -83,6 +83,78 @@ function jsonLdImages(html: string): string[] {
   return out;
 }
 
+function attr(tag: string, name: string): string | null {
+  const m = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']+)["']`, "i"));
+  return m ? m[1] : null;
+}
+
+// Devuelve la URL de mayor resolución de un srcset ("a.jpg 600w, b.jpg 2000w").
+function largestFromSrcset(srcset: string): string | null {
+  let best: string | null = null;
+  let bestW = -1;
+  for (const part of srcset.split(",")) {
+    const seg = part.trim().split(/\s+/);
+    const u = seg[0];
+    if (!u) continue;
+    const w = seg[1] && /(\d+)w/.test(seg[1]) ? parseInt(seg[1], 10) : 0;
+    if (w > bestW) {
+      bestW = w;
+      best = u;
+    }
+  }
+  return best;
+}
+
+// Fotos en tags <img> (con soporte de lazy-load y srcset). Es lo que usan
+// muchos sitios (WordPress/Swiper, etc.) que no tienen og:image.
+function imgTagImages(html: string): string[] {
+  const out: string[] = [];
+  const tags = html.match(/<img\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const w = parseInt(attr(tag, "width") || "", 10);
+    const h = parseInt(attr(tag, "height") || "", 10);
+    if ((w && w <= 120) || (h && h <= 120)) continue; // descarta miniaturas/íconos
+    let url =
+      attr(tag, "data-src") ||
+      attr(tag, "data-lazy-src") ||
+      attr(tag, "data-original") ||
+      attr(tag, "src");
+    const ss = attr(tag, "srcset") || attr(tag, "data-srcset");
+    if (ss) {
+      const best = largestFromSrcset(ss);
+      if (best) url = best;
+    }
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+// Enlaces <a href="...jpg"> que apuntan directo a una imagen (galerías
+// con miniatura que enlaza a la foto a tamaño completo).
+function anchorImageHrefs(html: string): string[] {
+  const out: string[] = [];
+  const re =
+    /<a\b[^>]+href=["']([^"']+\.(?:jpe?g|png|webp|avif)(?:\?[^"']*)?)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) out.push(m[1]);
+  return out;
+}
+
+// Logos, íconos, pixeles de tracking, placeholders → fuera.
+const JUNK =
+  /(?:logo|sprite|icon|favicon|avatar|placeholder|spinner|loader|loading|blank|pixel|spacer|1x1|transparent|watermark|cropped-)/i;
+
+// Decodifica entidades comunes en URLs del HTML (&amp; rompe el query string).
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/gi, "&")
+    .replace(/&#0*38;/g, "&")
+    .replace(/&#x0*26;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/gi, "'");
+}
+
 function extractImages(html: string, base: string): string[] {
   const raw = [
     ...metaContent(html, "og:image:secure_url"),
@@ -91,14 +163,23 @@ function extractImages(html: string, base: string): string[] {
     ...metaContent(html, "twitter:image:src"),
     ...metaContent(html, "twitter:image"),
     ...jsonLdImages(html),
+    ...anchorImageHrefs(html),
+    ...imgTagImages(html),
   ];
 
   const seen = new Set<string>();
   const out: string[] = [];
   for (const r of raw) {
-    const a = absolutize(base, r.trim());
+    const a = absolutize(base, decodeEntities(r.trim()));
     if (!a || !/^https?:/i.test(a)) continue;
-    if (/\.svg($|\?)/i.test(a)) continue; // descarta íconos/logos vectoriales
+    if (/\.svg($|\?)/i.test(a)) continue; // descarta vectoriales
+    if (JUNK.test(a)) continue; // descarta logos/íconos
+    try {
+      // descarta enlaces a páginas (ej. /wiki/File:foo.jpg), no a imágenes
+      if (new URL(a).pathname.includes(":")) continue;
+    } catch {
+      continue;
+    }
     if (seen.has(a)) continue;
     seen.add(a);
     out.push(a);
