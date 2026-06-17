@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, BedDouble, Maximize, Waves, Heart } from "lucide-react";
 import { T } from "@/lib/tokens";
-import { peso } from "@/lib/format";
+import { peso, pricePerM2 } from "@/lib/format";
 import { fetchFotos } from "@/lib/fotos";
 import type { Property } from "@/types";
 
@@ -165,9 +165,16 @@ export default function PropertyCard({
             </span>
           )}
         </div>
-        <p style={{ margin: "14px 0 0", fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>
-          {peso(p.precio)}
-        </p>
+        <div style={{ margin: "14px 0 0", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>
+            {peso(p.precio)}
+          </p>
+          {pricePerM2(p.precio, p.m2) && (
+            <span style={{ color: T.sub, fontSize: 12.5, fontWeight: 500 }}>
+              {pricePerM2(p.precio, p.m2)} / m²
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
