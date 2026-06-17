@@ -25,11 +25,14 @@ export async function fetchFotos(website?: string): Promise<string[]> {
     const r = await fetch("/api/fotos?url=" + encodeURIComponent(website));
     const j = await r.json();
     const arr: string[] = Array.isArray(j.images) ? j.images : [];
-    mem.set(website, arr);
-    try {
-      sessionStorage.setItem(key, JSON.stringify(arr));
-    } catch {
-      /* ignore quota */
+    // Solo cachea resultados con fotos; un vacío se reintenta la próxima vez.
+    if (arr.length) {
+      mem.set(website, arr);
+      try {
+        sessionStorage.setItem(key, JSON.stringify(arr));
+      } catch {
+        /* ignore quota */
+      }
     }
     return arr;
   } catch {
