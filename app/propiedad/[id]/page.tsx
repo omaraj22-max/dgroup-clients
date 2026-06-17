@@ -8,7 +8,6 @@ import {
   Maximize,
   Waves,
   Heart,
-  ExternalLink,
   ArrowLeft,
   Ruler,
   type LucideIcon,
@@ -330,28 +329,6 @@ export default function PropiedadDetallePage() {
                   ? "Te interesa  ·  notificado a tu asesor"
                   : "Me interesa"}
               </button>
-              {prop.website && (
-                <a
-                  href={prop.website}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    padding: "16px 22px",
-                    borderRadius: 14,
-                    border: `1px solid ${T.line}`,
-                    background: T.card,
-                    color: T.ink,
-                    fontSize: 15,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  Ver anuncio <ExternalLink size={16} />
-                </a>
-              )}
             </div>
           </div>
         </div>
