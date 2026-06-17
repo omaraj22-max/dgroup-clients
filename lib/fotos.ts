@@ -9,7 +9,8 @@ export async function fetchFotos(website?: string): Promise<string[]> {
   if (!website) return [];
   if (mem.has(website)) return mem.get(website)!;
 
-  const key = "fotos:" + website;
+  // v2: invalida cualquier [] pineado por versiones anteriores del scraper.
+  const key = "fotos:v2:" + website;
   try {
     const cached = sessionStorage.getItem(key);
     if (cached) {
