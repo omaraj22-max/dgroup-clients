@@ -17,27 +17,28 @@ export default function PropertyCard({
 }) {
   const router = useRouter();
   const manual = p.fotos?.[0];
+  const source = p.website || p.mapa; // página de la propiedad o link de Google Maps
   const [cover, setCover] = useState<string>(manual || "");
 
-  // Si no hay foto manual pero sí URL de la página, jala la portada.
+  // Si no hay foto manual pero sí una fuente (web o Maps), jala la portada.
   useEffect(() => {
     if (manual) {
       setCover(manual);
       return;
     }
-    if (p.website) {
+    if (source) {
       let alive = true;
-      fetchFotos(p.website).then((imgs) => {
+      fetchFotos(source).then((imgs) => {
         if (alive && imgs[0]) setCover(imgs[0]);
       });
       return () => {
         alive = false;
       };
     }
-  }, [manual, p.website]);
+  }, [manual, source]);
 
   const shown = cover || "https://picsum.photos/seed/" + p.id + "/800/600";
-  const waiting = !cover && !!p.website;
+  const waiting = !cover && !!source;
 
   return (
     <div

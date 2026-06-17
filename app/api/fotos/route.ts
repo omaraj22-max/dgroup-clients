@@ -9,6 +9,100 @@ export const runtime = "nodejs";
 export const revalidate = 86400;
 
 const MAX_IMAGES = 20;
+const MAX_GOOGLE = 8; // tope de fotos vía Places API (controla costo)
+const GKEY = process.env.GOOGLE_MAPS_API_KEY || "";
+
+// ¿La URL es de Google Maps? (lugar, o link corto)
+function isGoogleMaps(u: URL): boolean {
+  const h = u.hostname.toLowerCase();
+  if (h === "maps.app.goo.gl" || h === "maps.google.com") return true;
+  if (h === "goo.gl" && /\/maps/.test(u.pathname)) return true;
+  if (/(^|\.)google\.[a-z.]+$/.test(h) && /\/maps(\/|$)/.test(u.pathname)) return true;
+  return false;
+}
+
+function placeNameFromUrl(s: string): string | null {
+  const m = s.match(/\/maps\/place\/([^/@]+)/);
+  if (!m) return null;
+  const raw = m[1].replace(/\+/g, " ");
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function latLngFromUrl(s: string): { lat: number; lng: number } | null {
+  const m =
+    s.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/) ||
+    s.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if (!m) return null;
+  return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+}
+
+// Trae las fotos de un lugar de Google Maps usando la Places API (New).
+// Requiere GOOGLE_MAPS_API_KEY. Sin key, devuelve [] (no rompe nada).
+async function placesPhotos(mapsUrl: string): Promise<string[]> {
+  if (!GKEY) return [];
+
+  // Resuelve el link corto para tener nombre/coords en la URL final.
+  let full = mapsUrl;
+  try {
+    const host = new URL(mapsUrl).hostname;
+    if (/maps\.app\.goo\.gl|goo\.gl/.test(host)) {
+      const r = await fetch(mapsUrl, {
+        redirect: "follow",
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; InmobiliariaPV/1.0)" },
+      });
+      full = r.url || mapsUrl;
+    }
+  } catch {
+    /* sigue con la URL original */
+  }
+
+  const name = placeNameFromUrl(full);
+  if (!name) return [];
+  const ll = latLngFromUrl(full);
+
+  // 1) Text Search → encuentra el lugar y sus fotos.
+  let photos: { name: string }[] = [];
+  try {
+    const body: Record<string, unknown> = { textQuery: name, maxResultCount: 1 };
+    if (ll) {
+      body.locationBias = {
+        circle: { center: { latitude: ll.lat, longitude: ll.lng }, radius: 300 },
+      };
+    }
+    const sr = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GKEY,
+        "X-Goog-FieldMask": "places.id,places.photos",
+      },
+      body: JSON.stringify(body),
+    });
+    const j = await sr.json();
+    photos = (j?.places?.[0]?.photos as { name: string }[]) || [];
+  } catch {
+    return [];
+  }
+
+  // 2) Resuelve cada foto a su URL pública (sin exponer la API key).
+  const out: string[] = [];
+  for (const p of photos.slice(0, MAX_GOOGLE)) {
+    try {
+      const mr = await fetch(
+        `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=1600&skipHttpRedirect=true&key=${GKEY}`
+      );
+      const mj = await mr.json();
+      if (mj?.photoUri) out.push(mj.photoUri);
+    } catch {
+      /* salta esta foto */
+    }
+  }
+  return out;
+}
 
 // Bloquea hosts internos/privados (anti-SSRF básico).
 function isBlockedHost(host: string): boolean {
@@ -202,6 +296,16 @@ export async function GET(req: NextRequest) {
   }
   if (!/^https?:$/.test(target.protocol) || isBlockedHost(target.hostname)) {
     return NextResponse.json({ images: [], error: "blocked" }, { status: 400 });
+  }
+
+  // Google Maps → Places API (no se puede scrapear el HTML).
+  if (isGoogleMaps(target)) {
+    const images = await placesPhotos(target.href);
+    return NextResponse.json({
+      images,
+      source: "places",
+      keyMissing: !GKEY || undefined,
+    });
   }
 
   const ctrl = new AbortController();

@@ -69,10 +69,11 @@ export default function PropiedadDetallePage() {
       setFotos(prop.fotos);
       return;
     }
-    if (prop.website) {
+    const source = prop.website || prop.mapa; // web de la propiedad o link de Maps
+    if (source) {
       let alive = true;
       setFotosLoading(true);
-      fetchFotos(prop.website)
+      fetchFotos(source)
         .then((imgs) => {
           if (alive) setFotos(imgs);
         })
